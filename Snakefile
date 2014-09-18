@@ -139,15 +139,39 @@ rule PeptideIndexer:
         ]
         openms.PeptideIndexer(input, output, extra_args=extra, ini=params)
 
+rule IDMerger:
+    input: workspace(*["{}.peptides.probs.indexed.idXML".format(n) for n in NAMES])
+    output: workspace("IDmerged.idXML")
+    params: params('IDMerger')
+    run:
+        openms.IDMerger(input, output, ini=params)
+
+#rule FalseDiscoveryRate:
+#    input: workspace("IDmerged.idXML")
+#    output: workspace('IDmerged_fdr.idXML')
+#    params: params('FalseDiscoveryRate')
+#    run:
+#        openms.FalseDiscoveryRate(input, output, ini=params)
+
+
+rule IDRipper:
+    input: workspace("IDmerged.idXML")
+    output: workspace(*["{}.ripped_consensus.idXML".format(n) for n in NAMES])
+    params: params("IDRipper")
+    run:
+        openms.IDRipper(input, output, ini=params)
+
+
 rule FidoAdapter:
-    input: workspace("{name}.peptides.probs.indexed.idXML")
-    output: workspace("{name}.protein_grps.idXML")
+    input: workspace("IDmerged.idXML")
+    output: workspace("protein_grps.idXML")
     params: params('FidoAdapter')
     run:
         openms.FidoAdapter(input, output, ini=params)
 
+
 rule IDMapper:
-    input: *workspace("{name}.featureXML", "{name}.peptides.probs.indexed.idXML")
+    input: *workspace("{name}.featureXML", "{name}.ripped_consensus.idXML")
     output: workspace("{name}.mapped.featureXML")
     params: params('IDMapper')
     run:
@@ -155,7 +179,7 @@ rule IDMapper:
         openms.IDMapper(input[0:1], output, extra_args=extra, ini=params)
 
 rule ProteinQuantifier:
-    input: *workspace("{name}.mapped.featureXML", "{name}.protein_grps.idXML")
+    input: *workspace("{name}.mapped.featureXML", "protein_grps.idXML")
     output: workspace("{name}.quantified.protein_grps.csv")
     params: params('ProteinQuantifier')
     run:
