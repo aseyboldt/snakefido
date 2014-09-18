@@ -4,10 +4,16 @@ from os.path import join as pjoin
 from os.path import exists as pexists
 from collections import namedtuple
 import json
+import glob
 
 FASTA = "/home/adr/data/testfido/raw/uniprot-mouse_taxonomy_10090_keyword_181_20140226_CON_REV.fasta"
 XTANDEM_EXEC = "../tandem-linux-13-09-01-1/bin/64-bit/all_static/tandem.exe"
+OPENMS_BIN = "../OpenMS/bin"
 
+BASEDIR = os.getcwd()
+
+files = glob.glob(pjoin(BASEDIR, 'raw', '*.mzML'))
+NAMES = [os.path.splitext(os.path.split(p)[1])[0] for p in files]
 
 class OpenMS:
     def __init__(self, bin_path, ini_dir, log_dir):
@@ -45,15 +51,15 @@ class OpenMS:
 
         return wrapper
 
-openms = OpenMS('../OpenMS/bin', './inis', './logs')
+openms = OpenMS(OPENMS_BIN, pjoin(BASEDIR, 'inis'), pjoin(BASEDIR, 'logs'))
 
 
 def storage(*args):
-    return [pjoin('/home/adr/data/testfido/raw', x) for x in args]
+    return [pjoin(BASEDIR, 'raw', x) for x in args]
 
 
 def workspace(*args):
-    return [pjoin('/home/adr/data/testfido/work', x) for x in args]
+    return [pjoin(BASEDIR, 'work', x) for x in args]
 
 
 def results(*args):
