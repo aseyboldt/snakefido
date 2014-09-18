@@ -6,13 +6,13 @@ from collections import namedtuple
 import json
 import glob
 
-FASTA = "/home/adr/data/testfido/raw/uniprot-mouse_taxonomy_10090_keyword_181_20140226_CON_REV.fasta"
-XTANDEM_EXEC = "../tandem-linux-13-09-01-1/bin/64-bit/all_static/tandem.exe"
-OPENMS_BIN = "../OpenMS/bin"
-
 BASEDIR = os.getcwd()
 
-files = glob.glob(pjoin(BASEDIR, 'raw', '*.mzML'))
+OPENMS_BIN = "../OpenMS/bin"
+XTANDEM_EXEC = "../tandem-linux-13-09-01-1/bin/64-bit/all_static/tandem.exe"
+
+FASTA = pjoin(BASEDIR, "18Protein_SoCe_Tr_detergents_trace_target_decoy.fasta")
+files = glob.glob(pjoin(BASEDIR, 'data', '*.mzML'))
 NAMES = [os.path.splitext(os.path.split(p)[1])[0] for p in files]
 
 class OpenMS:
@@ -55,7 +55,7 @@ openms = OpenMS(OPENMS_BIN, pjoin(BASEDIR, 'inis'), pjoin(BASEDIR, 'logs'))
 
 
 def storage(*args):
-    return [pjoin(BASEDIR, 'raw', x) for x in args]
+    return [pjoin(BASEDIR, 'data', x) for x in args]
 
 
 def workspace(*args):
@@ -81,7 +81,9 @@ def params(name):
 
 
 rule all:
-    input: workspace('testfile.quantified.protein_grps.csv')
+    input: workspace( \
+        *['{}.quantified.protein_grps.csv'.format(n) for n in NAMES] \
+    )
 
 rule stage_data:
     input: storage("{name}.mzML")
@@ -89,21 +91,21 @@ rule stage_data:
     run:
         subprocess.check_call(['cp', '--', str(input), str(output)])
 
-rule find_peaks:
+rule PeakPickerHiRes:
     input: workspace("{name}.mzML")
     output: workspace("{name}.peaks.mzML")
     params: params('PeakPickerHiRes')
     run:
         openms.PeakPickerHiRes(input, output, ini=params)
 
-rule find_features:
+rule FeatureFinderCentroided:
     input: workspace("{name}.peaks.mzML")
     output: workspace("{name}.featureXML")
     params: params('FeatureFinderCentroided')
     run:
         openms.FeatureFinderCentroided(input, output, ini=params)
 
-rule find_peptides_ms2:
+rule XTandemAdapter:
     input: workspace("{name}.mzML")
     output: workspace("{name}.peptides.idXML")
     params: params('XTandemAdapter')
@@ -114,7 +116,7 @@ rule find_peptides_ms2:
         ]
         openms.XTandemAdapter(input, output, extra_args=extra, ini=params)
 
-rule scores_to_probs:
+rule IDPosteriorErrorProbability:
     input: workspace("{name}.idXML")
     output: workspace("{name}.probs.idXML")
     params: params('IDPosteriorErrorProbability')
@@ -124,7 +126,7 @@ rule scores_to_probs:
             input, output, extra_args=extra, ini=params
         )
 
-rule index_peptides:
+rule PeptideIndexer:
     input: workspace("{name}.idXML")
     output: workspace("{name}.indexed.idXML")
     params: params('PeptideIndexer')
@@ -137,14 +139,14 @@ rule index_peptides:
         ]
         openms.PeptideIndexer(input, output, extra_args=extra, ini=params)
 
-rule identify_proteins:
+rule FidoAdapter:
     input: workspace("{name}.peptides.probs.indexed.idXML")
     output: workspace("{name}.protein_grps.idXML")
     params: params('FidoAdapter')
     run:
         openms.FidoAdapter(input, output, ini=params)
 
-rule map_features_to_peptides:
+rule IDMapper:
     input: *workspace("{name}.featureXML", "{name}.peptides.probs.indexed.idXML")
     output: workspace("{name}.mapped.featureXML")
     params: params('IDMapper')
@@ -152,7 +154,7 @@ rule map_features_to_peptides:
         extra = ['-id', input[1]]
         openms.IDMapper(input[0:1], output, extra_args=extra, ini=params)
 
-rule quantify_protein_grps:
+rule ProteinQuantifier:
     input: *workspace("{name}.mapped.featureXML", "{name}.protein_grps.idXML")
     output: workspace("{name}.quantified.protein_grps.csv")
     params: params('ProteinQuantifier')
